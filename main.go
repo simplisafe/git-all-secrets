@@ -23,6 +23,7 @@ var (
 	org        = flag.String("org", "", "Name of the Organization to scan. Example: secretorg123")
 	token      = flag.String("token", "", "Github Personal Access Token. This is required.")
 	outputFile = flag.String("output", "results.txt", "Output file to save the results.")
+	protocol   = flag.String("protocol", "https", "Specify which protocol to use when cloning: https or ssh. Defaults to https")
 	user       = flag.String("user", "", "Name of the Github user to scan. Example: secretuser1")
 	repoURL    = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
 	gistURL    = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
@@ -44,6 +45,32 @@ func check(e error) {
 	} else if _, ok := e.(*github.AcceptedError); ok {
 		log.Println("scheduled on GitHub side")
 	}
+}
+
+// DRY - move logic out of clone functions
+func executeclone(repo *github.Repository, directory string, wg *sync.WaitGroup) error {
+	urlToClone := ""
+	switch *protocol {
+	case "https":
+		urlToClone = *repo.CloneURL
+	case "ssh":
+		urlToClone = *repo.SSHURL
+	default:
+		fmt.Println("Unrecognized protocol: '" + *protocol + "'")
+		os.Exit(2)
+	}
+
+	// do not clone forks
+	if !*cloneForks && *repo.Fork {
+		return nil
+	} else {
+		// clone it
+		wg.Add(1)
+		fmt.Println(urlToClone)
+		// thread out the git clone
+		go gitclone(urlToClone, directory, wg)
+	}
+	return nil
 }
 
 func gitclone(cloneURL string, repoName string, wg *sync.WaitGroup) {
@@ -76,24 +103,7 @@ func cloneorgrepos(ctx context.Context, client *github.Client, org string) error
 	var orgclone sync.WaitGroup
 	//iterating through the repo array
 	for _, repo := range orgRepos {
-
-		switch *cloneForks {
-		case true:
-			//cloning everything
-			orgclone.Add(1)
-			fmt.Println(*repo.CloneURL)
-			//cloning the individual org repos
-			go gitclone(*repo.CloneURL, "/tmp/repos/org/"+*repo.Name, &orgclone)
-		case false:
-			//not cloning forks
-			if !*repo.Fork {
-				orgclone.Add(1)
-				fmt.Println(*repo.CloneURL)
-				//cloning the individual org repos
-				go gitclone(*repo.CloneURL, "/tmp/repos/org/"+*repo.Name, &orgclone)
-			}
-		}
-
+		executeclone(repo, "/tmp/repos/org/"+*repo.Name, &orgclone)
 	}
 	orgclone.Wait()
 	fmt.Println("")
@@ -121,21 +131,7 @@ func cloneuserrepos(ctx context.Context, client *github.Client, user string) err
 	var userrepoclone sync.WaitGroup
 	//iterating through the userRepos array
 	for _, userRepo := range userRepos {
-		switch *cloneForks {
-		case true:
-			//cloning everything
-			userrepoclone.Add(1)
-			fmt.Println(*userRepo.CloneURL)
-			go gitclone(*userRepo.CloneURL, "/tmp/repos/users/"+user+"/"+*userRepo.Name, &userrepoclone)
-		case false:
-			//not cloning forks
-			if !*userRepo.Fork {
-				userrepoclone.Add(1)
-				fmt.Println(*userRepo.CloneURL)
-				go gitclone(*userRepo.CloneURL, "/tmp/repos/users/"+user+"/"+*userRepo.Name, &userrepoclone)
-			}
-		}
-
+		executeclone(userRepo, "/tmp/repos/users/"+user+"/"+*repo.Name, &userrepoclone)
 	}
 
 	userrepoclone.Wait()
@@ -384,7 +380,7 @@ func scanorgrepos(org string) error {
 	return nil
 }
 
-func checkflags(token, org, user, repoURL, gistURL string) error {
+func checkflags(token, org, user, repoURL, gistURL, protocol string) error {
 	if token == "" {
 		fmt.Println("Need a Github personal access token. Please provide that using the -token flag")
 		os.Exit(2)
@@ -404,6 +400,12 @@ func checkflags(token, org, user, repoURL, gistURL string) error {
 		fmt.Println("Can't have gistURL along with any of org, user or repoURL. Please provide just one of these values")
 		os.Exit(2)
 	}
+
+	if protocol != "https" && protocol != "ssh" {
+		fmt.Println("Unrecognized protocol: '" + protocol + "'. Please use https or ssh")
+		os.Exit(2)
+	}
+
 	return nil
 }
 
@@ -425,7 +427,7 @@ func main() {
 	flag.Parse()
 
 	//Logic to check the program is ingesting proper flags
-	err := checkflags(*token, *org, *user, *repoURL, *gistURL)
+	err := checkflags(*token, *org, *user, *repoURL, *gistURL, *protocol)
 	check(err)
 
 	//Authenticating to Github using the token

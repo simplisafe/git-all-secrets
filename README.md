@@ -37,6 +37,7 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * -token = Github personal access token. We need this because unauthenticated requests to the Github API can hit the rate limiting pretty soon!
 * -org = Name of the Organization to scan. This will scan all repos in the org + all the repos & gists of all users in the org.
 * -user = Name of the User to scan. This will scan all the repos & gists of this user.
+* -protocol = Specify which protocol to use when cloning: https or ssh. Defaults to https
 * -repoURL = HTTPS URL of the Repo to scan. This will scan this repository only.
 * -gistURL = HTTPS URL of the Gist to scan. This will scan this gist only.
 * -output = This is the name of the file where all the results will get stored. By default, this is `results.txt`.
