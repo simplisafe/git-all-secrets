@@ -131,7 +131,7 @@ func cloneuserrepos(ctx context.Context, client *github.Client, user string) err
 	var userrepoclone sync.WaitGroup
 	//iterating through the userRepos array
 	for _, userRepo := range userRepos {
-		executeclone(userRepo, "/tmp/repos/users/"+user+"/"+*repo.Name, &userrepoclone)
+		executeclone(userRepo, "/tmp/repos/users/"+user+"/"+*userRepo.Name, &userrepoclone)
 	}
 
 	userrepoclone.Wait()
