@@ -36,6 +36,7 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 ## Flags/Options
 * -token = Github personal access token. We need this because unauthenticated requests to the Github API can hit the rate limiting pretty soon!
 * -org = Name of the Organization to scan. This will scan all repos in the org + all the repos & gists of all users in the org.
+* -teamName = Name of the Organization Team which has access to private repositories for scanning
 * -user = Name of the User to scan. This will scan all the repos & gists of this user.
 * -protocol = Specify which protocol to use when cloning: https or ssh. Defaults to https
 * -repoURL = HTTPS URL of the Repo to scan. This will scan this repository only.
@@ -50,6 +51,7 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * The `token` flag is compulsory. This can't be empty.
 * The `org`, `user`, `repoURL` and `gistURL` can't be all empty at the same time. You need to provide just one of these values. If you provide all of them or multiple values together, the order of precendence will be `org` > `user` > `repoURL` > `gistURL`. For instance, if you provide both the flags `-org=secretorg123` and `-user=secretuser1` together, the tool will complain that it doesn't need anything along with the `org` value. To run it against a particular user only, just need to provide the `user` flag and not the `org` flag.
 * When specifying the `ssh` value to the `protocol` flag: one must have prepared the Docker container with a suitable ssh key. Refer to [scanning private repositories](#scanning-private-repositories) below.
+* When specifying `teamName` it is important that the provided `token` belong to a user which is a member of the team. Unexpected results may occur otherwise. In addition, listing repositories for a team will reveal private repos. Refer to [scanning private repositories](#scanning-private-repositories)  and [scanning an organization team](#scanning-an-organization-team) below.
 
 ## Demo
 A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu.be
@@ -92,7 +94,7 @@ So, as you can see, there are decent tools out there, but they had to be combine
 
 The most secure way to scan private repositories is to clone using the SSH URLs. To accomplish this, one needs to place an appropriate SSH key which has been added to a Github User. Github has [helpful documentation](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/) for configuring your account.
 
-To add your private key to the `git-all-secrets` container, is a pretty simple process. Using the command line interface, prepare a build directory and your ssh key:
+To add your private key to the `git-all-secrets` container is a pretty simple process. Using the command line interface, prepare a build directory and your ssh key:
 
 ```bash
     # First prepare a build directory:
@@ -146,6 +148,29 @@ Finally, build your container, and tag it git-all-secrets-ssh:
 </details><br />
 
 At this point, one can use the commands above in the [getting started](#getting-started) section. Substitute `git-all-secrets-ssh:latest` for `abhartiya/tools_gitallsecrets:v6`.
+
+#### Scanning an Organization Team
+
+The Github API limits the circumstances where a private repository is reported. If one is trying to scan an Organization with a user which is not an admin, you may need to provide the team which provides repository access to the user.
+
+Here's an example leveraging `teamName`:
+
+<details>
+  <summary><code>docker run --tty git-all-secrets-ssh:latest -token=github_token -org=my-github-org -orgOnly=1 -protocol ssh -teamName read-only</code></summary>
+
+    Org was specified combined with orgOnly, the tool will proceed to scan all the org repos non-recursively
+    Cloning the repositories of the organization: my-github-org
+    git@github.com:my-github-org/test-repo.git
+
+    Since team name was provided, the tool will clone all repos to which the team has access
+    Listing teams...
+    Cloning the repositories of the team: read-only(1234567)
+    git@github.com:my-github-org/xxx.git
+    ...
+
+    Scanning all team repositories now...This may take a while so please be patient
+
+</details><br />
 
 ### Changelog
 * 10/14/17 - Built and pushed the new image abhartiya/tools_gitallsecrets:v6. This new image has the newer version of `git-secrets` as well as `repo-supervisor` i.e. I merged some upstream changes into my fork alongwith some additional changes I had already made in my fork. The new image uses these changes so everything is latest and greatest!

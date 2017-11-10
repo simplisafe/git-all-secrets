@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -24,6 +25,7 @@ var (
 	token      = flag.String("token", "", "Github Personal Access Token. This is required.")
 	outputFile = flag.String("output", "results.txt", "Output file to save the results.")
 	protocol   = flag.String("protocol", "https", "Specify which protocol to use when cloning: https or ssh. Defaults to https")
+	teamName   = flag.String("teamName", "", "Name of the Organization Team which has access to private repositories for scanning.")
 	user       = flag.String("user", "", "Name of the Github user to scan. Example: secretuser1")
 	repoURL    = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
 	gistURL    = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
@@ -107,6 +109,69 @@ func cloneorgrepos(ctx context.Context, client *github.Client, org string) error
 	}
 	orgclone.Wait()
 	fmt.Println("")
+	return nil
+}
+
+func findTeamByName(ctx context.Context, client *github.Client, org string, teamName string) (*github.Team, error) {
+
+	listTeamsOpts := &github.ListOptions{
+		PerPage: 10,
+	}
+	Info("Listing teams...")
+	for {
+		teams, resp, err := client.Organizations.ListTeams(ctx, org, listTeamsOpts)
+		check(err)
+		//check the name here--try to avoid additional API calls if we've found the team
+		for _, team := range teams {
+			if *team.Name == teamName {
+				return team, nil
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		listTeamsOpts.Page = resp.NextPage
+	}
+	return nil, nil
+}
+
+func cloneTeamRepos(ctx context.Context, client *github.Client, org string, teamName string) error {
+
+	// var team *github.Team
+	team, error := findTeamByName(ctx, client, org, teamName)
+	if team != nil {
+		Info("Cloning the repositories of the team: " + *team.Name + "(" + strconv.Itoa(*team.ID) + ")")
+		var teamRepos []*github.Repository
+		listTeamRepoOpts := &github.ListOptions{
+			PerPage: 10,
+		}
+
+		Info("Listing team repositories...")
+		for {
+			repos, resp, err := client.Organizations.ListTeamRepos(ctx, *team.ID, listTeamRepoOpts)
+			check(err)
+			teamRepos = append(teamRepos, repos...) //adding to the repo array
+			if resp.NextPage == 0 {
+				break
+			}
+			listTeamRepoOpts.Page = resp.NextPage
+		}
+
+		var teamclone sync.WaitGroup
+		//iterating through the repo array
+		for _, repo := range teamRepos {
+			executeclone(repo, "/tmp/repos/team/"+*repo.Name, &teamclone)
+		}
+		teamclone.Wait()
+		fmt.Println("")
+	} else {
+		fmt.Println("Unable to find the team '" + teamName + "'; perhaps the user is not a member?\n")
+		if error != nil {
+			fmt.Println("Error was:")
+			fmt.Println(error)
+		}
+		os.Exit(2)
+	}
 	return nil
 }
 
@@ -367,20 +432,31 @@ func combineOutput(toolname string, outputfile string) error {
 	return nil
 }
 
-func scanorgrepos(org string) error {
-	var wgorg sync.WaitGroup
+// DRY
+func scanDir(dir string, org string) error {
+	var wg sync.WaitGroup
 
-	gitorgrepos, _ := ioutil.ReadDir("/tmp/repos/org/")
-	for _, f := range gitorgrepos {
-		wgorg.Add(1)
-		go runGitTools(*toolName, "/tmp/repos/org/"+f.Name()+"/", &wgorg, f.Name(), org)
+	allRepos, _ := ioutil.ReadDir(dir)
+	for _, f := range allRepos {
+		wg.Add(1)
+		go runGitTools(*toolName, dir+f.Name()+"/", &wg, f.Name(), org)
 
 	}
-	wgorg.Wait()
+	wg.Wait()
 	return nil
 }
 
-func checkflags(token, org, user, repoURL, gistURL, protocol string) error {
+func scanorgrepos(org string) error {
+	scanDir("/tmp/repos/org/", org)
+	return nil
+}
+
+func scanTeamRepos(org string) error {
+	scanDir("/tmp/repos/team/", org)
+	return nil
+}
+
+func checkflags(token, org, user, repoURL, gistURL, protocol, teamName string) error {
 	if token == "" {
 		fmt.Println("Need a Github personal access token. Please provide that using the -token flag")
 		os.Exit(2)
@@ -399,6 +475,9 @@ func checkflags(token, org, user, repoURL, gistURL, protocol string) error {
 	} else if gistURL != "" && (org != "" || repoURL != "" || user != "") {
 		fmt.Println("Can't have gistURL along with any of org, user or repoURL. Please provide just one of these values")
 		os.Exit(2)
+	} else if teamName != "" && org == "" {
+		fmt.Println("Can't have teamName without an org! Please provide a value for org.")
+		os.Exit(2)
 	}
 
 	if protocol != "https" && protocol != "ssh" {
@@ -411,6 +490,7 @@ func checkflags(token, org, user, repoURL, gistURL, protocol string) error {
 
 func makeDirectories() error {
 	os.MkdirAll("/tmp/repos/org", 0700)
+	os.MkdirAll("/tmp/repos/team", 0700)
 	os.MkdirAll("/tmp/repos/users", 0700)
 	os.MkdirAll("/tmp/repos/singlerepo", 0700)
 	os.MkdirAll("/tmp/repos/singlegist", 0700)
@@ -427,7 +507,7 @@ func main() {
 	flag.Parse()
 
 	//Logic to check the program is ingesting proper flags
-	err := checkflags(*token, *org, *user, *repoURL, *gistURL, *protocol)
+	err := checkflags(*token, *org, *user, *repoURL, *gistURL, *protocol, *teamName)
 	check(err)
 
 	//Authenticating to Github using the token
@@ -456,6 +536,18 @@ func main() {
 		//cloning all the repos of the org
 		err := cloneorgrepos(ctx, client, *org)
 		check(err)
+
+		if *teamName != "" { //If team was supplied
+			Info("Since team name was provided, the tool will clone all repos to which the team has access")
+			//cloning all the repos of the team
+			err := cloneTeamRepos(ctx, client, *org, *teamName)
+			check(err)
+
+			Info("Scanning all team repositories now...This may take a while so please be patient\n")
+			err = scanTeamRepos(*org)
+			check(err)
+			Info("Finished scanning all team repositories\n")
+		}
 
 		//getting all the users of the org into the allUsers array
 		allUsers, err := listallusers(ctx, client, *org)
