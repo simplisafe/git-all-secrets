@@ -36,9 +36,9 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 ## Flags/Options
 * -token = Github personal access token. We need this because unauthenticated requests to the Github API can hit the rate limiting pretty soon!
 * -org = Name of the Organization to scan. This will scan all repos in the org + all the repos & gists of all users in the org.
-* -teamName = Name of the Organization Team which has access to private repositories for scanning
+* -teamName = Name of the Organization Team which has access to private repositories for scanning.
 * -user = Name of the User to scan. This will scan all the repos & gists of this user.
-* -protocol = Specify which protocol to use when cloning: https or ssh. Defaults to https
+* -protocol = Which protocol to use when cloning: https or ssh. Default is https.
 * -repoURL = HTTPS URL of the Repo to scan. This will scan this repository only.
 * -gistURL = HTTPS URL of the Gist to scan. This will scan this gist only.
 * -output = This is the name of the file where all the results will get stored. By default, this is `results.txt`.
@@ -148,6 +148,17 @@ Finally, build your container, and tag it git-all-secrets-ssh:
 </details><br />
 
 At this point, one can use the commands above in the [getting started](#getting-started) section. Substitute `git-all-secrets-ssh:latest` for `abhartiya/tools_gitallsecrets:v6`.
+
+**NOTE: DO NOT publish this container publicly!** It contains your SSH private key and should be considered an artifact worth securing.
+
+To clean up when one is finished, run the following:
+
+```bash
+    # Remove the image
+    $ docker rmi --force git-all-secrets-ssh:latest
+    # Remove the ssh key
+    $ rm -f id_rsa
+```
 
 #### Scanning an Organization Team
 
