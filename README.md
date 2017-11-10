@@ -49,7 +49,7 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 ### Note
 * The `token` flag is compulsory. This can't be empty.
 * The `org`, `user`, `repoURL` and `gistURL` can't be all empty at the same time. You need to provide just one of these values. If you provide all of them or multiple values together, the order of precendence will be `org` > `user` > `repoURL` > `gistURL`. For instance, if you provide both the flags `-org=secretorg123` and `-user=secretuser1` together, the tool will complain that it doesn't need anything along with the `org` value. To run it against a particular user only, just need to provide the `user` flag and not the `org` flag.
-
+* When specifying the `ssh` value to the `protocol` flag: one must have prepared the Docker container with a suitable ssh key. Refer to [scanning private repositories](#scanning-private-repositories) below.
 
 ## Demo
 A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu.be
@@ -87,6 +87,65 @@ Then, there is truffleHog that looks for secrets in the actual contents of the f
 Finally, there is git-secrets which can flag things like AWS secrets. The best part is that you can add your own regular expressions as well for secrets that you know it should be looking for. A major drawback is that it doesn't do a good job on finding high entropy strings like truffleHog does. You can also only scan a particular directory that is a repository so no recursion scanning from a directory of repositories either.
 
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
+
+### Scanning Private Repositories
+
+The most secure way to scan private repositories is to clone using the SSH URLs. To accomplish this, one needs to place an appropriate SSH key which has been added to a Github User. Github has [helpful documentation](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/) for configuring your account.
+
+To add your private key to the `git-all-secrets` container, is a pretty simple process. Using the command line interface, prepare a build directory and your ssh key:
+
+```bash
+    # First prepare a build directory:
+    $ mkdir git-all-secrets-SSH
+
+    # Copy your ssh key to the directory:
+    $ cp ~/.ssh/my_github_private_key git-all-secrets-SSH/id_rsa
+```
+
+Then create a simple `Dockerfile`:
+
+```bash
+    $ cd git-all-secrets-SSH
+    # Create the Dockerfile
+    $ echo "FROM abhartiya/tools_gitallsecrets:v6
+
+# add my ssh key for github
+WORKDIR /root/.ssh
+ADD id_rsa /root/.ssh
+RUN chmod 400 /root/.ssh/id_rsa
+
+# restore the workdir for the entrypoint
+WORKDIR /data" > Dockerfile
+```
+
+Finally, build your container, and tag it git-all-secrets-ssh:
+
+<details>
+  <summary><code>$ docker build . -t git-all-secrets-ssh</code></summary>
+
+```bash
+    Sending build context to Docker daemon  4.608kB
+    Step 1/5 : FROM abhartiya/tools_gitallsecrets:v6
+     ---> 486e14113690
+    Step 2/5 : WORKDIR /root/.ssh
+     ---> cfd997cbcd1f
+    Removing intermediate container 34020117dabd
+    Step 3/5 : ADD id_rsa /root/.ssh
+     ---> 8b10ed6578ca
+    Step 4/5 : RUN chmod 400 /root/.ssh/id_rsa
+     ---> Running in 6788014cce2e
+     ---> 90c17cc4fe1e
+    Removing intermediate container 6788014cce2e
+    Step 5/5 : WORKDIR /data
+     ---> 00ea80f1f585
+    Removing intermediate container 9b22a081ff55
+    Successfully built 00ea80f1f585
+    Successfully tagged git-all-secrets-ssh:latest
+```
+
+</details><br />
+
+At this point, one can use the commands above in the [getting started](#getting-started) section. Substitute `git-all-secrets-ssh:latest` for `abhartiya/tools_gitallsecrets:v6`.
 
 ### Changelog
 * 10/14/17 - Built and pushed the new image abhartiya/tools_gitallsecrets:v6. This new image has the newer version of `git-secrets` as well as `repo-supervisor` i.e. I merged some upstream changes into my fork alongwith some additional changes I had already made in my fork. The new image uses these changes so everything is latest and greatest!
