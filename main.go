@@ -32,6 +32,7 @@ var (
 	toolName             = flag.String("toolName", "all", "Specify whether to run gitsecrets, thog or repo-supervisor")
 	teamName             = flag.String("teamName", "", "Name of the Organization Team which has access to private repositories for scanning.")
 	scanPrivateReposOnly = flag.Bool("scanPrivateReposOnly", false, "Option to scan private repositories only. Default is false")
+	thogRegex            = flag.Bool("thogRegex", false, "Option utilize truffleHog's high impact regular expression mode. Default is false")
 )
 
 // Info Function to show colored text
@@ -232,9 +233,20 @@ func runGitsecrets(filepath string, reponame string, orgoruser string) error {
 
 func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	outputFile1 := "/tmp/results/thog/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
-	cmd1 := exec.Command("./thog/truffleHog/truffleHog.py", "-o", outputFile1, filepath)
-	var out1 bytes.Buffer
-	cmd1.Stdout = &out1
+
+	// open the out file for writing
+	outfile, fileErr := os.OpenFile(outputFile1, os.O_CREATE|os.O_RDWR, 0644)
+	check(fileErr)
+	defer outfile.Close()
+
+	extraOptions := ""
+	if *thogRegex {
+		extraOptions = " --regex --entropy=False "
+	}
+	cmd1 := exec.Command("truffleHog", extraOptions, filepath)
+
+	// direct stdout to the outfile
+	cmd1.Stdout = outfile
 	err1 := cmd1.Run()
 	check(err1)
 	return nil

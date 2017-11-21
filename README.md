@@ -48,6 +48,7 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * -toolName = This is the optional string flag to specify which tool to use for scanning. By default, this is set to `all` i.e. gitsecrets, thog and repo-supervisor will all be used for scanning.
 * -teamName = Name of the Organization Team which has access to private repositories for scanning.
 * -scanPrivateReposOnly = This is the optional boolean flag to specify if you want to scan private repositories or not. It will not scan public repositories.
+* -thogRegex = This is the optional boolean flag to enabled truffleHog's regular expression matching mode. This mode should have fewer false positives than the normal entropy based scan.  By default, this is set to `0` i.e. regular behavior. To enbable regular expression matches, this value needs to be set to `1`.
 
 
 ### Note
