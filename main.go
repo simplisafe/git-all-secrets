@@ -239,11 +239,12 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	check(fileErr)
 	defer outfile.Close()
 
-	extraOptions := ""
+	cmd1 := exec.Command("trufflehog", filepath)
+
+	// enable regex mode?
 	if *thogRegex {
-		extraOptions = " --regex --entropy=False "
+		cmd1 = exec.Command("trufflehog", "--regex", "--entropy=False", filepath)
 	}
-	cmd1 := exec.Command("truffleHog", extraOptions, filepath)
 
 	// direct stdout to the outfile
 	cmd1.Stdout = outfile
