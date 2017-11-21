@@ -6,7 +6,7 @@ WORKDIR /data/thog
 
 RUN apt-get update && apt-get install -y python-pip jq
 # truffleHog pip package version 2.0.0 added the regex feature
-RUN pip install truffleHog>=2.0.0
+RUN pip install 'truffleHog>=2.0.0'
 
 # create a generic SSH config for Github
 WORKDIR /root/.ssh
