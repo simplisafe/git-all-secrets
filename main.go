@@ -256,7 +256,9 @@ func listallusers(ctx context.Context, client *github.Client, org string) ([]*gi
 }
 
 func runTrufflehog(filepath string, reponame string, orgoruser string) error {
-	outputFile1 := "/tmp/results/thog/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
+	uuid_temp, uerr := uuid.NewV4()
+	check(uerr)
+	outputFile1 := "/tmp/results/thog/" + orgoruser + "_" + reponame + "_" + uuid_temp.String() + ".txt"
 
 	// open the out file for writing
 	outfile, fileErr := os.OpenFile(outputFile1, os.O_CREATE|os.O_RDWR, 0644)
@@ -286,7 +288,9 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 }
 
 func runReposupervisor(filepath string, reponame string, orgoruser string) error {
-	outputFile3 := "/tmp/results/repo-supervisor/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
+	uuid_temp, uerr := uuid.NewV4()
+	check(uerr)
+	outputFile3 := "/tmp/results/repo-supervisor/" + orgoruser + "_" + reponame + "_" + uuid_temp.String() + ".txt"
 	cmd3 := exec.Command("./runreposupervisor.sh", filepath, outputFile3)
 	var out3 bytes.Buffer
 	cmd3.Stdout = &out3
@@ -686,7 +690,7 @@ func cloneTeamRepos(ctx context.Context, client *github.Client, org string, team
 	team, err := findTeamByName(ctx, client, org, teamName)
 
 	if team != nil {
-		Info("Cloning the repositories of the team: " + *team.Name + "(" + strconv.Itoa(*team.ID) + ")")
+		Info("Cloning the repositories of the team: " + *team.Name + "(" + strconv.Itoa(int(*team.ID)) + ")")
 		var teamRepos []*github.Repository
 		listTeamRepoOpts := &github.ListOptions{
 			PerPage: 10,
