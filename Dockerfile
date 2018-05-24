@@ -29,7 +29,7 @@ RUN /bin/bash -c "source ~/.bashrc && cd /data/repo-supervisor && npm install --
 
 # Trufflehog
 WORKDIR /data
-RUN git clone https://github.com/dxa4481/truffleHog.git
+# RUN git clone https://github.com/dxa4481/truffleHog.git
 
 # Go deps
 RUN go get github.com/google/go-github/github && go get github.com/satori/go.uuid && go get golang.org/x/oauth2
@@ -39,9 +39,11 @@ COPY main.go /data/main.go
 COPY runreposupervisor.sh /data/runreposupervisor.sh
 
 RUN chmod +x runreposupervisor.sh
-COPY regexChecks.py /data/truffleHog/truffleHog/regexChecks.py
-COPY requirements.txt /data/truffleHog/requirements.txt
-RUN pip install -r /data/truffleHog/requirements.txt
+COPY regexChecks.json /data/regexChecks.json
+# COPY regexChecks.py /data/truffleHog/truffleHog/regexChecks.py
+# COPY requirements.txt /data/truffleHog/requirements.txt
+# RUN pip install -r /data/truffleHog/requirements.txt
+RUN pip install trufflehog
 
 # build our code
 RUN go build -o gitallsecrets .
